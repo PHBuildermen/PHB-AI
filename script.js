@@ -5,7 +5,6 @@ const messagesContainer = document.getElementById('chat-messages');
 const chatForm = document.getElementById('chat-form');
 const chatInput = document.getElementById('chat-input');
 
-// Add message to chat
 function addMessage(text, isUser) {
     const div = document.createElement('div');
     div.className = `flex ${isUser ? 'justify-end' : 'justify-start'}`;
@@ -15,7 +14,7 @@ function addMessage(text, isUser) {
     } else {
         div.innerHTML = `
             <div class="flex gap-3 max-w-[80%]">
-                <div class="w-8 h-8 rounded-2xl bg-gradient-to-br from-cyan-400 to-purple-600 flex items-center justify-center text-white font-bold">P</div>
+                <div class="w-8 h-8 rounded-2xl bg-gradient-to-br from-cyan-400 to-purple-600 flex items-center justify-center text-white font-bold flex-shrink-0">P</div>
                 <div class="chat-bubble-ai rounded-3xl rounded-tl-none px-6 py-4">${text}</div>
             </div>`;
     }
@@ -23,25 +22,25 @@ function addMessage(text, isUser) {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
-// Send message to OpenAI
+// Improved API Call with better error handling
 async function sendToOpenAI(message) {
     if (!apiKey) {
         addMessage("Please connect your OpenAI API key first.", false);
         return;
     }
 
-    const thinking = document.createElement('div');
-    thinking.className = "flex justify-start";
-    thinking.innerHTML = `
+    const thinkingDiv = document.createElement('div');
+    thinkingDiv.className = "flex justify-start";
+    thinkingDiv.innerHTML = `
         <div class="flex gap-3">
             <div class="w-8 h-8 rounded-2xl bg-gradient-to-br from-cyan-400 to-purple-600 flex items-center justify-center text-white font-bold">P</div>
             <div class="chat-bubble-ai rounded-3xl rounded-tl-none px-6 py-4">Thinking...</div>
         </div>`;
-    messagesContainer.appendChild(thinking);
+    messagesContainer.appendChild(thinkingDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
     try {
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -50,32 +49,42 @@ async function sendToOpenAI(message) {
             body: JSON.stringify({
                 model: currentModel,
                 messages: [
-                    { role: "system", content: "You are PHB AI, a friendly, helpful, and intelligent assistant from the Philippines." },
+                    { 
+                        role: "system", 
+                        content: "You are PHB AI, a friendly, smart, and helpful AI assistant from the Philippines. Respond naturally and helpfully." 
+                    },
                     { role: "user", content: message }
                 ],
-                temperature: 0.75,
+                temperature: 0.7,
             })
         });
 
-        thinking.remove();
+        const data = await response.json();
 
-        const data = await res.json();
+        // Remove thinking message
+        thinkingDiv.remove();
+
+        if (!response.ok) {
+            console.error("OpenAI Error:", data);
+            addMessage(`❌ OpenAI Error: ${data.error?.message || response.statusText}`, false);
+            return;
+        }
+
         if (data.choices && data.choices[0]?.message?.content) {
             addMessage(data.choices[0].message.content, false);
         } else {
-            addMessage("Sorry, I received an invalid response.", false);
+            addMessage("Sorry, I received an unexpected response from OpenAI.", false);
         }
     } catch (err) {
-        thinking.remove();
-        addMessage("Connection error. Please check your API key.", false);
+        thinkingDiv.remove();
         console.error(err);
+        addMessage("Network error. Please check your internet connection or API key.", false);
     }
 }
 
-// Initialize Chat
 function initChat() {
     messagesContainer.innerHTML = '';
-    addMessage("Hello! I'm PHB AI. How can I help you today?", false);
+    addMessage("Hello! I'm PHB AI. How can I help you today? 😊", false);
 }
 
 // Form Submit
@@ -89,21 +98,21 @@ chatForm.addEventListener('submit', (e) => {
     sendToOpenAI(message);
 });
 
-// API Key Management
+// API Key Functions (unchanged)
 function saveAPIKey() {
     const key = document.getElementById('api-key-input').value.trim();
     const model = document.getElementById('model-select').value;
 
-    if (key.startsWith('sk-')) {
+    if (key && key.startsWith('sk-')) {
         apiKey = key;
         currentModel = model;
         localStorage.setItem('phb_openai_key', key);
         localStorage.setItem('phb_model', model);
         document.getElementById('model-name').textContent = model;
         closeModal();
-        addMessage("✅ Successfully connected to OpenAI!", false);
+        addMessage("✅ Successfully connected! Let's try again.", false);
     } else {
-        alert("Please enter a valid OpenAI API key starting with 'sk-'");
+        alert("Please enter a valid OpenAI API key (starts with sk-)");
     }
 }
 
@@ -116,7 +125,7 @@ function closeModal() {
     document.getElementById('api-modal').classList.add('hidden');
 }
 
-// Load on start
+// Initialize
 window.onload = () => {
     initChat();
     if (apiKey) {
